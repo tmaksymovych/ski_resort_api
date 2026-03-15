@@ -12,8 +12,31 @@ SkiPasses_db = [
 
 @app.route('/visitors', methods=['GET'])
 def get_visitors():
-    limit = int(request.args.get('limit', 10))
-    return jsonify(visitors_db[:limit]), 200
+    try:
+        page = int(request.args.get('page', 1))
+        size = int(request.args.get('size', 10))
+    except ValueError:
+        abort(400, description="Page and size must be integers")
+    
+    start = (page - 1) * size
+    end = start + size
+    
+    paginated_visitors = visitors_db[start:end]
+
+    total_records = len(visitors_db)
+    total_pages = (total_records + size - 1) // size
+
+    return jsonify({
+        "metadata": {
+            "current_page": page,
+            "page_size": size,
+            "total_records": total_records,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1
+        },
+        "data": paginated_visitors
+    }), 200
 
 @app.route('/visitors', methods=['POST'])
 def create_visitor():
@@ -27,6 +50,13 @@ def create_visitor():
     }
     visitors_db.append(new_visitor)
     return jsonify(new_visitor), 201
+
+@app.route('/visitors/<int:visitor_id>', methods=['GET'])
+def get_visitor(visitor_id):
+    visitor = next((v for v in visitors_db if v["id"] == visitor_id), None)
+    if visitor is None:
+        abort(404, description="Visitor not found")
+    return jsonify(visitor), 200
 
 @app.route('/visitors/<int:visitor_id>/ski-passes', methods=['GET'])
 def get_ski_passes(visitor_id):
